@@ -37,45 +37,58 @@ jobs:
       run: |
         echo "=== Test Results Summary ==="
 
-        if [ -f target/surefire-reports/TEST-*.xml ]; then
-          echo "✓ Test reports found"
-        else
-          echo "✗ No test reports found"
+        if [ ! -d "target/surefire-reports" ]; then
+          echo "No test reports directory found"
           exit 1
         fi
+
+        TEST_FILES=$(find target/surefire-reports -name "TEST-*.xml" 2>/dev/null | wc -l)
+        if [ "$TEST_FILES" -eq 0 ]; then
+          echo "No test reports found"
+          exit 1
+        fi
+
+        echo "Test reports found ($TEST_FILES files)"
 
         TOTAL_TESTS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'tests="[0-9]*"' {} \; | sed 's/tests="//;s/"//' | awk '{s+=$1} END {print s}')
         FAILED_TESTS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'failures="[0-9]*"' {} \; | sed 's/failures="//;s/"//' | awk '{s+=$1} END {print s}')
         SKIPPED_TESTS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'skipped="[0-9]*"' {} \; | sed 's/skipped="//;s/"//' | awk '{s+=$1} END {print s}')
         ERROR_TESTS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -o 'errors="[0-9]*"' {} \; | sed 's/errors="//;s/"//' | awk '{s+=$1} END {print s}')
 
+        TOTAL_TESTS=${TOTAL_TESTS:-0}
+        FAILED_TESTS=${FAILED_TESTS:-0}
+        SKIPPED_TESTS=${SKIPPED_TESTS:-0}
+        ERROR_TESTS=${ERROR_TESTS:-0}
+
         PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS - SKIPPED_TESTS - ERROR_TESTS))
 
+        echo "════════════════════════════════"
         echo "Total tests: $TOTAL_TESTS"
         echo "Passed: $PASSED_TESTS"
         echo "Failed: $FAILED_TESTS"
         echo "Errors: $ERROR_TESTS"
         echo "Skipped: $SKIPPED_TESTS"
+        echo "════════════════════════════════"
 
         MIN_TESTS=10
         if [ "$TOTAL_TESTS" -lt "$MIN_TESTS" ]; then
-          echo "⚠ Warning: Expected at least $MIN_TESTS tests, but found only $TOTAL_TESTS"
+          echo "Warning: Expected at least $MIN_TESTS tests, but found only $TOTAL_TESTS"
         fi
 
         IMPLEMENTED_TESTS=$((TOTAL_TESTS - SKIPPED_TESTS))
         if [ "$IMPLEMENTED_TESTS" -eq 0 ]; then
-          echo "✗ No tests implemented (all tests are @Disabled)"
+          echo "No tests implemented (all tests are @Disabled)"
           exit 1
         fi
 
-        echo "✓ Implemented tests: $IMPLEMENTED_TESTS"
+        echo "Implemented tests: $IMPLEMENTED_TESTS"
 
         if [ "$FAILED_TESTS" -gt 0 ] || [ "$ERROR_TESTS" -gt 0 ]; then
-          echo "✗ Some tests are failing or have errors"
+          echo "Some tests are failing or have errors"
           exit 1
         fi
 
-        echo "✓ All implemented tests passed successfully!"
+        echo "All implemented tests passed successfully!"
 
     - name: Upload test results
       if: always()
